@@ -1,5 +1,10 @@
 class Folder {
-  const Folder({this.id, required this.name, required this.createdAt, this.cardCount = 0});
+  const Folder({
+    this.id,
+    required this.name,
+    required this.createdAt,
+    this.cardCount = 0,
+  });
   final int? id;
   final String name;
   final String createdAt;
@@ -20,8 +25,14 @@ class Folder {
 }
 
 class CardRecord {
-  const CardRecord({this.id, required this.title, required this.suit,
-    required this.folderId, this.notes = '', this.imageRef});
+  const CardRecord({
+    this.id,
+    required this.title,
+    required this.suit,
+    required this.folderId,
+    this.notes = '',
+    this.imageRef,
+  });
   static const suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades'];
   final int? id;
   final String title;

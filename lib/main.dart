@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'database_helper.dart';
+import 'catalogue.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,6 +21,12 @@ Future<void> main() async {
     );
     return;
   }
+  assert(() {
+    helper.inspectSchema().then(
+      (details) => debugPrint('Schema diagnostics: $details'),
+    );
+    return true;
+  }());
   runApp(DirectoryApp(helper: helper));
 }
 
@@ -30,7 +37,15 @@ class DirectoryApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) => MaterialApp(
     debugShowCheckedModeBanner: false,
-    home: GuestRoster(helper: helper),
+    home: Builder(
+      builder: (context) => FoldersPage(
+        helper: helper,
+        openGuests: () => Navigator.push<void>(
+          context,
+          MaterialPageRoute(builder: (_) => GuestRoster(helper: helper)),
+        ),
+      ),
+    ),
   );
 }
 

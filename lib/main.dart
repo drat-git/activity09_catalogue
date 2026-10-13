@@ -1,122 +1,281 @@
 import 'package:flutter/material.dart';
 
-void main() {
-  runApp(const MyApp());
-}
+import 'database_helper.dart';
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
-
-  // This widget is the root of your application.
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Flutter Demo',
-      theme: ThemeData(
-        // This is the theme of your application.
-        //
-        // TRY THIS: Try running your application with "flutter run". You'll see
-        // the application has a purple toolbar. Then, without quitting the app,
-        // try changing the seedColor in the colorScheme below to Colors.green
-        // and then invoke "hot reload" (save your changes or press the "hot
-        // reload" button in a Flutter-supported IDE, or press "r" if you used
-        // the command line to start the app).
-        //
-        // Notice that the counter didn't reset back to zero; the application
-        // state is not lost during the reload. To reset the state, use hot
-        // restart instead.
-        //
-        // This works for code too, not just values: Most code changes can be
-        // tested with just a hot reload.
-        colorScheme: .fromSeed(seedColor: Colors.deepPurple),
-      ),
-      home: const MyHomePage(title: 'Flutter Demo Home Page'),
-    );
-  }
-}
-
-class MyHomePage extends StatefulWidget {
-  const MyHomePage({super.key, required this.title});
-
-  // This widget is the home page of your application. It is stateful, meaning
-  // that it has a State object (defined below) that contains fields that affect
-  // how it looks.
-
-  // This class is the configuration for the state. It holds the values (in this
-  // case the title) provided by the parent (in this case the App widget) and
-  // used by the build method of the State. Fields in a Widget subclass are
-  // always marked "final".
-
-  final String title;
-
-  @override
-  State<MyHomePage> createState() => _MyHomePageState();
-}
-
-class _MyHomePageState extends State<MyHomePage> {
-  int _counter = 0;
-
-  void _incrementCounter() {
-    setState(() {
-      // This call to setState tells the Flutter framework that something has
-      // changed in this State, which causes it to rerun the build method below
-      // so that the display can reflect the updated values. If we changed
-      // _counter without calling setState(), then the build method would not be
-      // called again, and so nothing would appear to happen.
-      _counter++;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    // This method is rerun every time setState is called, for instance as done
-    // by the _incrementCounter method above.
-    //
-    // The Flutter framework has been optimized to make rerunning build methods
-    // fast, so that you can just rebuild anything that needs updating rather
-    // than having to individually change instances of widgets.
-    return Scaffold(
-      appBar: AppBar(
-        // TRY THIS: Try changing the color here to a specific color (to
-        // Colors.amber, perhaps?) and trigger a hot reload to see the AppBar
-        // change color while the other colors stay the same.
-        backgroundColor: Theme.of(context).colorScheme.inversePrimary,
-        // Here we take the value from the MyHomePage object that was created by
-        // the App.build method, and use it to set our appbar title.
-        title: Text(widget.title),
-      ),
-      body: Center(
-        // Center is a layout widget. It takes a single child and positions it
-        // in the middle of the parent.
-        child: Column(
-          // Column is also a layout widget. It takes a list of children and
-          // arranges them vertically. By default, it sizes itself to fit its
-          // children horizontally, and tries to be as tall as its parent.
-          //
-          // Column has various properties to control how it sizes itself and
-          // how it positions its children. Here we use mainAxisAlignment to
-          // center the children vertically; the main axis here is the vertical
-          // axis because Columns are vertical (the cross axis would be
-          // horizontal).
-          //
-          // TRY THIS: Invoke "debug painting" (choose the "Toggle Debug Paint"
-          // action in the IDE, or press "p" in the console), to see the
-          // wireframe for each widget.
-          mainAxisAlignment: .center,
-          children: [
-            const Text('You have pushed the button this many times:'),
-            Text(
-              '$_counter',
-              style: Theme.of(context).textTheme.headlineMedium,
-            ),
-          ],
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  final helper = DatabaseHelper();
+  try {
+    await helper.init();
+  } catch (error, stack) {
+    debugPrint('Database initialization failed: $error\n$stack');
+    runApp(
+      const MaterialApp(
+        home: Scaffold(
+          body: Center(
+            child: Text('Could not open local storage. Restart the app.'),
+          ),
         ),
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: _incrementCounter,
-        tooltip: 'Increment',
-        child: const Icon(Icons.add),
+    );
+    return;
+  }
+  runApp(DirectoryApp(helper: helper));
+}
+
+class DirectoryApp extends StatelessWidget {
+  const DirectoryApp({super.key, required this.helper});
+  final DatabaseHelper helper;
+
+  @override
+  Widget build(BuildContext context) => MaterialApp(
+    debugShowCheckedModeBanner: false,
+    home: GuestRoster(helper: helper),
+  );
+}
+
+class GuestRoster extends StatefulWidget {
+  const GuestRoster({super.key, required this.helper});
+  final DatabaseHelper helper;
+
+  @override
+  State<GuestRoster> createState() => _GuestRosterState();
+}
+
+class _GuestRosterState extends State<GuestRoster> {
+  final _formKey = GlobalKey<FormState>();
+  final _name = TextEditingController();
+  final _age = TextEditingController();
+  List<Map<String, dynamic>> _rows = [];
+  int _count = 0;
+  int? _selectedId;
+  bool _busy = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  @override
+  void dispose() {
+    _name.dispose();
+    _age.dispose();
+    super.dispose();
+  }
+
+  void _message(String text) {
+    ScaffoldMessenger.of(context)
+      ..clearSnackBars()
+      ..showSnackBar(SnackBar(content: Text(text)));
+  }
+
+  Future<void> _load() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final rows = await widget.helper.queryAllRows();
+      final count = await widget.helper.queryRowCount();
+      if (!mounted) return;
+      setState(() {
+        _rows = rows;
+        _count = count;
+      });
+    } catch (error, stack) {
+      debugPrint('Guest read failed: $error\n$stack');
+      if (mounted)
+        setState(() => _error = 'Could not load guests. Use Refresh to retry.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _clear() {
+    _selectedId = null;
+    _name.clear();
+    _age.clear();
+    _formKey.currentState?.reset();
+  }
+
+  Future<void> _save() async {
+    if (_busy || !_formKey.currentState!.validate()) return;
+    setState(() => _busy = true);
+    try {
+      final row = <String, dynamic>{
+        DatabaseHelper.columnName: _name.text.trim(),
+        DatabaseHelper.columnAge: int.parse(_age.text.trim()),
+      };
+      final id = _selectedId;
+      final result = id == null
+          ? await widget.helper.insert(row)
+          : await widget.helper.update({...row, DatabaseHelper.columnId: id});
+      if (!mounted) return;
+      if (id != null && result == 0) {
+        _message('Guest no longer exists. No row was changed.');
+        await _load();
+        return;
+      }
+      setState(_clear);
+      _message(
+        id == null
+            ? 'Added guest ID $result.'
+            : 'Updated guest ID $id: $result row.',
+      );
+      await _load();
+      if (mounted && _error != null)
+        _message('Saved, but refresh failed. Use Refresh.');
+    } catch (error, stack) {
+      debugPrint('Guest save failed: $error\n$stack');
+      if (mounted) _message('Could not save guest. Your input is still here.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _delete(Map<String, dynamic> row) async {
+    if (_busy) return;
+    final id = row[DatabaseHelper.columnId] as int;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Delete guest?'),
+        content: Text('Delete ${row[DatabaseHelper.columnName]} (ID $id)?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('Cancel'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Delete'),
+          ),
+        ],
       ),
     );
+    if (confirmed != true || !mounted) return;
+    setState(() => _busy = true);
+    try {
+      final result = await widget.helper.delete(id);
+      if (!mounted) return;
+      if (_selectedId == id && result == 1) setState(_clear);
+      _message(
+        result == 1
+            ? 'Deleted guest ID $id: 1 row.'
+            : 'Guest no longer exists.',
+      );
+      await _load();
+      if (mounted && _error != null)
+        _message('Deleted, but refresh failed. Use Refresh.');
+    } catch (error, stack) {
+      debugPrint('Guest delete failed: $error\n$stack');
+      if (mounted) _message('Could not delete guest. Try again.');
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Fall Festival Roster'),
+      actions: [
+        IconButton(
+          tooltip: 'Refresh',
+          onPressed: _busy ? null : _load,
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+    ),
+    body: ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _name,
+                enabled: !_busy,
+                decoration: const InputDecoration(labelText: 'Name'),
+                validator: (value) => value == null || value.trim().isEmpty
+                    ? 'Enter a guest name.'
+                    : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _age,
+                enabled: !_busy,
+                keyboardType: TextInputType.number,
+                decoration: const InputDecoration(labelText: 'Age'),
+                validator: (value) {
+                  final age = int.tryParse(value?.trim() ?? '');
+                  return age == null || age < 0 || age > 130
+                      ? 'Enter a whole-number age from 0 to 130.'
+                      : null;
+                },
+              ),
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  ElevatedButton(
+                    onPressed: _busy ? null : _save,
+                    child: Text(
+                      _selectedId == null ? 'Add guest' : 'Save guest',
+                    ),
+                  ),
+                  if (_selectedId != null)
+                    TextButton(
+                      onPressed: _busy ? null : () => setState(_clear),
+                      child: const Text('Cancel edit'),
+                    ),
+                ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 24),
+        if (_busy) const LinearProgressIndicator(),
+        if (_error != null) Text(_error!),
+        if (_error == null && !_busy) Text('Guests: $_count'),
+        if (_error == null && !_busy && _rows.isEmpty)
+          const Text('No festival guests yet.'),
+        for (final row in _rows)
+          Card(
+            child: ListTile(
+              title: Text('${row[DatabaseHelper.columnName]}'),
+              subtitle: Text(
+                'ID ${row[DatabaseHelper.columnId]} · Age ${row[DatabaseHelper.columnAge]}',
+              ),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  IconButton(
+                    tooltip: 'Edit guest',
+                    icon: const Icon(Icons.edit),
+                    onPressed: _busy
+                        ? null
+                        : () {
+                            setState(() {
+                              _selectedId = row[DatabaseHelper.columnId] as int;
+                              _name.text =
+                                  row[DatabaseHelper.columnName] as String;
+                              _age.text = '${row[DatabaseHelper.columnAge]}';
+                            });
+                          },
+                  ),
+                  IconButton(
+                    tooltip: 'Delete guest',
+                    icon: const Icon(Icons.delete_outline),
+                    onPressed: _busy ? null : () => _delete(row),
+                  ),
+                ],
+              ),
+            ),
+          ),
+      ],
+    ),
+  );
 }

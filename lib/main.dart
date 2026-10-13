@@ -86,8 +86,9 @@ class _GuestRosterState extends State<GuestRoster> {
       });
     } catch (error, stack) {
       debugPrint('Guest read failed: $error\n$stack');
-      if (mounted)
+      if (mounted) {
         setState(() => _error = 'Could not load guests. Use Refresh to retry.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -125,8 +126,9 @@ class _GuestRosterState extends State<GuestRoster> {
             : 'Updated guest ID $id: $result row.',
       );
       await _load();
-      if (mounted && _error != null)
+      if (mounted && _error != null) {
         _message('Saved, but refresh failed. Use Refresh.');
+      }
     } catch (error, stack) {
       debugPrint('Guest save failed: $error\n$stack');
       if (mounted) _message('Could not save guest. Your input is still here.');
@@ -167,8 +169,9 @@ class _GuestRosterState extends State<GuestRoster> {
             : 'Guest no longer exists.',
       );
       await _load();
-      if (mounted && _error != null)
+      if (mounted && _error != null) {
         _message('Deleted, but refresh failed. Use Refresh.');
+      }
     } catch (error, stack) {
       debugPrint('Guest delete failed: $error\n$stack');
       if (mounted) _message('Could not delete guest. Try again.');

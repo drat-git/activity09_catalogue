@@ -1,10 +1,11 @@
 import 'package:path/path.dart';
+import 'models.dart';
 import 'package:sqflite/sqflite.dart';
 import 'package:path_provider/path_provider.dart';
 
 class DatabaseHelper {
   static const _databaseName = "MyDatabase.db";
-  static const _databaseVersion = 1;
+  static const _databaseVersion = 2;
   static const table = 'my_table';
   static const columnId = '_id';
   static const columnName = 'name';
@@ -17,7 +18,13 @@ class DatabaseHelper {
     _db = await openDatabase(
       path,
       version: _databaseVersion,
+      onConfigure: (db) async {
+        await db.execute('PRAGMA foreign_keys = ON');
+      },
       onCreate: _onCreate,
+      onUpgrade: (db, oldVersion, newVersion) async {
+        if (oldVersion < 2) await _createCatalogueTables(db);
+      },
     );
   }
 
@@ -30,6 +37,7 @@ $columnName TEXT NOT NULL,
 $columnAge INTEGER NOT NULL
 )
 ''');
+    await _createCatalogueTables(db);
   }
 
 // Helper methods
@@ -76,4 +84,50 @@ $columnAge INTEGER NOT NULL
       whereArgs: [id],
     );
   }
+  // The upgrade adds tables without changing the original guest rows.
+  Future<void> _createCatalogueTables(Database db) async {
+    await db.execute('CREATE TABLE folders ('
+        'id INTEGER PRIMARY KEY AUTOINCREMENT, '
+        'name TEXT NOT NULL UNIQUE, created_at TEXT NOT NULL)');
+    await db.execute("CREATE TABLE cards ("
+        "id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT NOT NULL, "
+        "suit TEXT NOT NULL, notes TEXT NOT NULL DEFAULT '', image_ref TEXT, "
+        "folder_id INTEGER NOT NULL, "
+        "FOREIGN KEY (folder_id) REFERENCES folders(id) ON DELETE CASCADE)");
+    await db.execute('CREATE INDEX idx_cards_folder_id ON cards(folder_id)');
+  }
+
+  Future<int> insertFolder(Folder folder) => _db.insert('folders', folder.toMap());
+
+  Future<List<Folder>> getFoldersWithCounts() async {
+    final rows = await _db.rawQuery(
+      'SELECT f.*, COUNT(c.id) AS card_count FROM folders f '
+      'LEFT JOIN cards c ON c.folder_id = f.id '
+      'GROUP BY f.id ORDER BY f.name COLLATE NOCASE, f.id',
+    );
+    return rows.map(Folder.fromMap).toList();
+  }
+
+  Future<List<CardRecord>> getCards(int folderId) async {
+    final rows = await _db.query('cards', where: 'folder_id = ?',
+      whereArgs: [folderId], orderBy: 'title COLLATE NOCASE, id');
+    return rows.map(CardRecord.fromMap).toList();
+  }
+
+  Future<int> insertCard(CardRecord card) => _db.insert('cards', card.toMap());
+
+  Future<int> updateCard(CardRecord card) => _db.update('cards', card.toMap(),
+    where: 'id = ?', whereArgs: [card.id]);
+
+  Future<int> deleteCard(int id) => _db.delete('cards', where: 'id = ?', whereArgs: [id]);
+
+  Future<int> deleteFolder(int id) => _db.delete('folders', where: 'id = ?', whereArgs: [id]);
+
+  Future<Map<String, Object?>> inspectSchema() async => {
+    'version': await _db.rawQuery('PRAGMA user_version'),
+    'foreign_keys': await _db.rawQuery('PRAGMA foreign_keys'),
+    'card_foreign_key': await _db.rawQuery('PRAGMA foreign_key_list(cards)'),
+    'card_indexes': await _db.rawQuery('PRAGMA index_list(cards)'),
+    'guests': await queryAllRows(),
+  };
 }

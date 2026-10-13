@@ -43,10 +43,11 @@ class _FoldersPageState extends State<FoldersPage> {
       if (mounted) setState(() => _folders = folders);
     } catch (error, stack) {
       debugPrint('Folder read failed: $error\n$stack');
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = 'Could not load folders. Use Refresh to retry.',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -111,10 +112,11 @@ class _FoldersPageState extends State<FoldersPage> {
           ? 'Deleted ${folder.name}: 1 folder row.'
           : 'Folder no longer exists; no row was deleted.';
       await _load();
-      if (mounted)
+      if (mounted) {
         _message(
           _error == null ? message : '$message Refresh failed; use Refresh.',
         );
+      }
     } catch (error, stack) {
       debugPrint('Folder delete failed: $error\n$stack');
       if (mounted) _message('Could not delete folder. Try again.');
@@ -215,10 +217,11 @@ class _FolderFormState extends State<FolderForm> {
       if (mounted) Navigator.pop(context, 'Added folder ID $id.');
     } catch (error, stack) {
       debugPrint('Folder save failed: $error\n$stack');
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = 'Could not save folder. That name may already exist. Choose a different name or try again.',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -300,8 +303,9 @@ class _CardsPageState extends State<CardsPage> {
       if (mounted) setState(() => _cards = cards);
     } catch (error, stack) {
       debugPrint('Card read failed: $error\n$stack');
-      if (mounted)
+      if (mounted) {
         setState(() => _error = 'Could not load cards. Use Refresh to retry.');
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -358,10 +362,11 @@ class _CardsPageState extends State<CardsPage> {
           ? 'Deleted card ID ${card.id}: 1 row.'
           : 'Card no longer exists; no row was deleted.';
       await _load();
-      if (mounted)
+      if (mounted) {
         _message(
           _error == null ? message : '$message Refresh failed; use Refresh.',
         );
+      }
     } catch (error, stack) {
       debugPrint('Card delete failed: $error\n$stack');
       if (mounted) _message('Could not delete card. Try again.');
@@ -474,8 +479,9 @@ class _CardFormState extends State<CardForm> {
       if (mounted) setState(() => _folders = folders);
     } catch (error, stack) {
       debugPrint('Form folders failed: $error\n$stack');
-      if (mounted)
+      if (mounted) {
         setState(() => _error = 'Could not load folders. Tap Retry.');
+      }
     } finally {
       if (mounted) setState(() => _loading = false);
     }
@@ -514,10 +520,11 @@ class _CardFormState extends State<CardForm> {
       );
     } catch (error, stack) {
       debugPrint('Card save failed: $error\n$stack');
-      if (mounted)
+      if (mounted) {
         setState(
           () => _error = 'Could not save card. Check the folder and try again. Your input is still here.',
         );
+      }
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -655,8 +662,9 @@ class CardArtwork extends StatelessWidget {
       ),
     );
     final reference = card.imageRef;
-    if (reference == null || !reference.startsWith('assets/'))
+    if (reference == null || !reference.startsWith('assets/')) {
       return placeholder;
+    }
     return Image.asset(
       reference,
       width: 40,
